@@ -36,13 +36,13 @@ PAYER_RULES: dict[str, dict[str, Any]] = {
                     "id": "pain_duration",
                     "description": "Pain duration >= 3 months",
                     "required": True,
-                    "evidence_fields": ["conditions"],
+                    "evidence_fields": ["conditions", "observations"],
                 },
                 {
                     "id": "physician_visit",
                     "description": "Minimum 1 physician office visit documented",
                     "required": True,
-                    "evidence_fields": ["encounters"],
+                    "evidence_fields": ["encounters", "observations"],
                 },
                 {
                     "id": "functional_impairment",
@@ -479,8 +479,8 @@ async def evaluate_criteria(
     # Keyword map for each criterion — used for automated evidence matching
     CRITERION_KEYWORDS: dict[str, list[str]] = {
         "conservative_treatment": ["physical therapy", "pt ", "chiropractic", "ibuprofen", "nsaid", "naproxen", "therapy"],
-        "pain_duration": ["back pain", "chronic", "low back", "lumbago", "pain"],
-        "physician_visit": ["visit", "encounter", "office", "consultation"],
+        "pain_duration": ["chronic", "back pain", "low back", "lumbago", "pain", "months", "duration", "onset"],
+        "physician_visit": ["visit", "encounter", "office", "consultation", "physician", "progress note"],
         "functional_impairment": ["impairment", "radiculopathy", "weakness", "numbness", "stenosis", "herniat"],
         "ra_diagnosis": ["rheumatoid", "arthritis", "m05", "m06"],
         "methotrexate_trial": ["methotrexate"],
