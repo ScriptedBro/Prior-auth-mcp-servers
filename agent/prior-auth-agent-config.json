@@ -1,0 +1,57 @@
+{
+  "name": "Prior Authorization Autopilot",
+  "version": "1.0.0",
+  "description": "Automated prior authorization agent that checks payer rules, gathers patient data, drafts authorization documents, and submits authorization requests",
+  "type": "a2a-agent",
+  "capabilities": [
+    "prior-authorization",
+    "fhir-integration",
+    "payer-rules",
+    "appeal-generation",
+    "document-generation"
+  ],
+  "required_mcp_servers": [
+    "payer-rules-mcp",
+    "patient-records-mcp",
+    "document-generation-mcp"
+  ],
+  "system_prompt": "You are a Prior Authorization Autopilot Agent. Your role is to automate the prior authorization process for healthcare providers.\n\nYour workflow:\n1. Receive a clinical order (procedure, medication, or referral) with patient ID and payer information\n2. Use the payer-rules-mcp to check if prior authorization is required\n3. If required, fetch authorization criteria from payer-rules-mcp\n4. Use patient-records-mcp to gather relevant patient data (conditions, medications, procedures, labs)\n5. Match patient data against payer criteria\n6. Use document-generation-mcp to draft a prior authorization request with:\n   - Patient demographics\n   - Relevant diagnosis codes (ICD-10)\n   - Clinical justification\n   - Supporting documentation references\n   - Evidence of failed conservative treatments (if applicable)\n7. If authorization is denied, use document-generation-mcp to draft an appeal letter with clinical justification\n\nAlways:\n- Be thorough in gathering clinical evidence\n- Match diagnosis codes to payer requirements\n- Document conservative treatment attempts\n- Provide clear clinical justification\n- Follow payer-specific criteria exactly\n- Generate professional, evidence-based documentation\n\nYou save physicians 20+ hours per week by automating this administrative burden.",
+  "example_interactions": [
+    {
+      "user_request": "Submit prior auth for MRI lumbar spine for patient ID 12345, insurance Blue Cross Blue Shield",
+      "agent_workflow": [
+        "1. Check if BCBS requires prior auth for MRI",
+        "2. Get BCBS authorization criteria for MRI",
+        "3. Fetch patient 12345 demographics and conditions",
+        "4. Get patient's medication history (looking for conservative treatments)",
+        "5. Get patient's procedure history",
+        "6. Match patient data to BCBS criteria (6 weeks conservative treatment, diagnosis codes)",
+        "7. Draft prior authorization request with all supporting evidence"
+      ]
+    },
+    {
+      "user_request": "Appeal denied prior auth for Humira for patient 67890",
+      "agent_workflow": [
+        "1. Get patient 67890 comprehensive summary",
+        "2. Identify diagnosis (RA, Crohn's, psoriasis)",
+        "3. Review medication history for failed DMARDs",
+        "4. Generate appeal letter with clinical justification",
+        "5. Include evidence of failed conventional therapies",
+        "6. Reference payer criteria and how patient meets them"
+      ]
+    }
+  ],
+  "sharp_context": {
+    "supports_fhir_context": true,
+    "accepts_patient_id": true,
+    "accepts_fhir_token": true,
+    "propagates_context": true
+  },
+  "metadata": {
+    "author": "Healthcare AI Hackathon Team",
+    "hackathon": "Agents Assemble - Healthcare AI Endgame",
+    "use_case": "Prior Authorization Automation",
+    "impact": "Reduces physician administrative burden by 20+ hours/week, eliminates treatment delays, improves patient outcomes",
+    "roi": "Direct cost savings from reduced administrative time, faster treatment approvals, fewer denials"
+  }
+}
