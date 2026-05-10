@@ -7,9 +7,29 @@ Supports both stdio and streamable HTTP transports.
 
 import json
 import os
+import asyncio
 from typing import Any
 
 from mcp.server import FastMCP
+
+try:
+    from google import genai
+except ImportError:
+    genai = None
+
+
+async def _call_gemini(prompt: str) -> str:
+    if genai is None:
+        raise RuntimeError("google-genai is not installed")
+    if not os.getenv("GEMINI_API_KEY"):
+        raise RuntimeError("GEMINI_API_KEY is not configured")
+    client = genai.Client()
+    response = await asyncio.to_thread(
+        client.models.generate_content,
+        model="gemini-2.0-flash",
+        contents=prompt,
+    )
+    return response.text
 
 
 def _server() -> FastMCP:
@@ -189,16 +209,41 @@ async def draft_appeal_letter(
 ) -> dict[str, Any]:
     """Draft an appeal letter for a denied prior authorization request."""
     payer_requirements = payer_requirements or {}
-    clinical_justification = _build_clinical_justification(
-        patient_summary,
-        {"procedure_or_medication": procedure_or_medication, "clinical_indication": denial_reason},
-        payer_requirements,
-        additional_notes,
-    )
     diagnoses = _diagnosis_lines(patient_summary)
+    medications = _medication_lines(patient_summary)
     procedures = _procedure_lines(patient_summary)
     patient_name = _patient_name(patient_summary)
-    letter = f"""PRIOR AUTHORIZATION APPEAL LETTER
+
+    prompt = f"""You are a clinical documentation specialist writing a prior authorization appeal letter.
+
+Patient: {patient_name}
+Payer: {payer}
+Denied procedure: {procedure_or_medication}
+Denial reason: {denial_reason}
+Active diagnoses: {', '.join(diagnoses) or 'None documented'}
+Current medications: {', '.join(medications) or 'None documented'}
+Treatment history: {', '.join(procedures) or 'None documented'}
+Additional notes: {additional_notes}
+
+Write a professional, medically compelling appeal letter that:
+1. Directly addresses the denial reason with specific clinical evidence
+2. Cites the patient's documented treatment history
+3. References relevant clinical guidelines where applicable
+4. Is concise, under 400 words
+5. Ends with a clear request for reconsideration
+
+Return only the letter text, no preamble or explanation."""
+
+    try:
+        letter = await _call_gemini(prompt)
+    except Exception:
+        clinical_justification = _build_clinical_justification(
+            patient_summary,
+            {"procedure_or_medication": procedure_or_medication, "clinical_indication": denial_reason},
+            payer_requirements,
+            additional_notes,
+        )
+        letter = f"""PRIOR AUTHORIZATION APPEAL LETTER
 
 Date: [Current Date]
 Payer: {payer}
@@ -236,6 +281,30 @@ Sincerely,
 
 
 @mcp.tool()
+async def draft_info_request(
+    patient_name: str,
+    procedure_or_medication: str,
+    missing_criteria: list[str],
+) -> dict[str, Any]:
+    """Draft a request to the ordering physician for missing PA documentation."""
+    items = "\n".join(f"  {i + 1}. {item}" for i, item in enumerate(missing_criteria))
+    return {
+        "info_request": f"""⚠️ Prior Authorization Hold — Additional Information Required
+
+Procedure: {procedure_or_medication}
+Patient: {patient_name}
+
+To complete the PA submission, please provide documentation for:
+
+{items}
+
+ClearPath will auto-submit once documentation is received.""",
+        "patient_name": patient_name,
+        "missing_items_count": len(missing_criteria),
+    }
+
+
+@mcp.tool()
 async def generate_supporting_document_checklist(
     order_details: dict[str, Any],
     payer_requirements: dict[str, Any],
@@ -267,6 +336,7 @@ async def call_tool(name: str, arguments: Any) -> list[Any]:
         "generate_clinical_justification": lambda: generate_clinical_justification(**arguments),
         "draft_prior_auth_request": lambda: draft_prior_auth_request(**arguments),
         "draft_appeal_letter": lambda: draft_appeal_letter(**arguments),
+        "draft_info_request": lambda: draft_info_request(**arguments),
         "generate_supporting_document_checklist": lambda: generate_supporting_document_checklist(**arguments),
     }
     if name not in handlers:
