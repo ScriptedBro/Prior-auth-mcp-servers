@@ -26,7 +26,7 @@ async def _call_gemini(prompt: str) -> str:
     client = genai.Client()
     response = await asyncio.to_thread(
         client.models.generate_content,
-        model="gemini-2.0-flash",
+        model="gemini-3.0-flash",
         contents=prompt,
     )
     return response.text
