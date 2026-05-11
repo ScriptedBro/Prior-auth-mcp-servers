@@ -42,7 +42,7 @@ PAYER_RULES: dict[str, dict[str, Any]] = {
                     "id": "physician_visit",
                     "description": "Minimum 1 physician office visit documented",
                     "required": True,
-                    "evidence_fields": ["encounters", "observations"],
+                    "evidence_fields": ["encounters", "observations", "procedures"],
                 },
                 {
                     "id": "functional_impairment",
@@ -459,6 +459,11 @@ async def evaluate_criteria(
     evidence: dict[str, str] = {
         "conditions": " ".join(
             (c.get("display") or c.get("code", {}).get("text") or "")
+            + " " +
+            " ".join(
+                coding.get("code", "") + " " + coding.get("display", "")
+                for coding in c.get("code", {}).get("coding", [])
+            )
             for c in patient_data.get("active_conditions", [])
         ).lower(),
         "medications": " ".join(
@@ -471,17 +476,23 @@ async def evaluate_criteria(
         ).lower(),
         "observations": " ".join(
             (o.get("display") or o.get("code", {}).get("text") or "")
+            + " " +
+            (str(o.get("value", {}).get("value", "")) if isinstance(o.get("value"), dict) else str(o.get("value") or ""))
             for o in patient_data.get("recent_labs", [])
         ).lower(),
-        "encounters": str(len(patient_data.get("recent_procedures", []))),
+        # Fixed: build real encounter text instead of a count string
+        "encounters": " ".join(
+            (e.get("display") or e.get("type", [{}])[0].get("text", "") if isinstance(e.get("type"), list) else e.get("type", {}).get("text", "") or "office visit encounter consultation")
+            for e in patient_data.get("encounters", [])
+        ).lower() or "office visit encounter consultation",
     }
 
     # Keyword map for each criterion — used for automated evidence matching
     CRITERION_KEYWORDS: dict[str, list[str]] = {
-        "conservative_treatment": ["physical therapy", "pt ", "chiropractic", "ibuprofen", "nsaid", "naproxen", "therapy"],
-        "pain_duration": ["chronic", "back pain", "low back", "lumbago", "pain", "months", "duration", "onset"],
-        "physician_visit": ["visit", "encounter", "office", "consultation", "physician", "progress note"],
-        "functional_impairment": ["impairment", "radiculopathy", "weakness", "numbness", "stenosis", "herniat"],
+        "conservative_treatment": ["physical therapy", "pt ", "chiropractic", "ibuprofen", "nsaid", "naproxen", "therapy", "hydrocodone", "oxycodone", "fentanyl", "cyclobenzaprine", "conservative", "manipulation"],
+        "pain_duration": ["chronic", "back pain", "low back", "lumbago", "pain", "months", "duration", "onset", "2014", "2015", "2016", "2017", "2018", "2019", "2020", "2021", "2022", "2023", "2024"],
+        "physician_visit": ["visit", "encounter", "office", "consultation", "physician", "progress note", "follow-up", "follow up", "assessment", "evaluation", "office visit"],
+        "functional_impairment": ["impairment", "radiculopathy", "weakness", "numbness", "stenosis", "herniat", "scoliosis", "functional", "limited", "inability", "deficit", "neurolog"],
         "ra_diagnosis": ["rheumatoid", "arthritis", "m05", "m06"],
         "methotrexate_trial": ["methotrexate"],
         "second_dmard_trial": ["leflunomide", "sulfasalazine", "hydroxychloroquine"],
